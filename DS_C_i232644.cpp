@@ -29,18 +29,21 @@ struct Key
 {
     int key_x;
     int key_y;
+    char symb = 'K';
 };
 
 struct Door
 {
     int door_x;
     int door_y;
+    char symb = 'D';
 };
 
 struct Coin
 {
     int coin_x;
     int coin_y;
+    char symb = 'C';
 };
 
 struct Bomb
@@ -48,12 +51,14 @@ struct Bomb
     int bomb_x;
     int bomb_y;
     bool detonate;
+    char symb = 'B';
 };
 
 class Grid
 {
   public:
     GridCell *head;
+    GridCell *tail;
     int level;
     int dimension;
     int moves;
@@ -74,6 +79,55 @@ class Grid
                 dimension = 15;
         }
         head = nullptr;
+        tail = nullptr;
+    }
+
+    void makGrid()
+    {
+        for (int i = 0; i < dimension; i++)
+        {
+            for (int j = 0; j < dimension; j++)
+            {
+                GridCell *cell = new GridCell(i, j, '.');
+
+                // setting the up and down boundaries
+                if (i == 0)
+                    cell->up = new GridCell(-1, -1, '#');
+                else if (i == dimension - 1)
+                    cell->down = new GridCell(-1, -1, '#');
+
+                // setting the left and right boundaries
+                if (j == 0)
+                    cell->left = new GridCell(-1, -1, '#');
+                else if (j == dimension - 1)
+                    cell->right = new GridCell(-1, -1, '#');
+
+                // if first cell
+                if (head == nullptr)
+                {
+                    head = cell;
+                    return;
+                }
+
+                // setting links for the cell other than the first one
+
+                // linking the upper adjacent cell if its not a boundary
+                if (cell->up->data != '#')
+                {
+                    cell->up = tail->up->right;
+                    tail->up->right->down = cell;
+                }
+                // linking the left adjacent cell if its not a boundary
+                if (cell->up->data != '#')
+                {
+                    cell->left = tail;
+                    tail->right = cell;
+                }
+
+                // updating the tail
+                tail = cell;
+            }
+        }
     }
 
     int cityBlockDistance(int x1, int y1, int x2, int y2)
@@ -94,10 +148,7 @@ int main()
     // refresh();               // Refresh to show the message
     // getch();                 // Wait for user input
     // endwin();                // End curses mode
-
-    // int *x = new int();
-    // int sum = 2 + static_cast<int>(*x);
-    // cout << x;
-
+    Grid G(1);
+    G.makGrid();
     return 0;
 }

@@ -25,16 +25,29 @@ class GridCell
     }
 };
 
-struct key
+struct Key
 {
     int key_x;
     int key_y;
 };
 
-struct coin
+struct Door
+{
+    int door_x;
+    int door_y;
+};
+
+struct Coin
 {
     int coin_x;
     int coin_y;
+};
+
+struct Bomb
+{
+    int bomb_x;
+    int bomb_y;
+    bool detonate;
 };
 
 class Grid
@@ -45,6 +58,7 @@ class Grid
     int dimension;
     int moves;
     int undoMoves;
+    Key key;
 
     Grid(int lvl)
     {
@@ -54,8 +68,11 @@ class Grid
             case 1:
                 dimension = 5;
                 // moves = cityBlockDistance(key_x, player_x, )
+            case 2:
+                dimension = 10;
+            case 3:
+                dimension = 15;
         }
-
         head = nullptr;
     }
 

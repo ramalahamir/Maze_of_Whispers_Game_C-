@@ -25,6 +25,18 @@ class GridCell
     }
 };
 
+struct key
+{
+    int key_x;
+    int key_y;
+};
+
+struct coin
+{
+    int coin_x;
+    int coin_y;
+};
+
 class Grid
 {
   public:

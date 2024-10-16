@@ -64,6 +64,13 @@ class Player
 
     int X;
     int Y;
+
+    Player(int movesAllowed, int undoMovesAllowed)
+    {
+        move_no = undoMove_no = 0;
+        total_moves = movesAllowed;
+        total_undo = undoMovesAllowed;
+    }
 };
 
 class Grid
@@ -78,27 +85,51 @@ class Grid
     int undoMoves;
     int score;
 
+    int player_key_dist;
+    int player_door_dist;
+    int key_door_dist;
+
     Key key;
     Player *player;
     Door door;
 
     Grid(int lvl)
     {
+        // calculating distance differences for player, key and door
+        setting_distance_differences();
+        int dist = player_door_dist + player_key_dist + key_door_dist;
+
         level = lvl;
         switch (level)
         {
             case 1:
-                dimension = 5;
+                dimension = 10;
+                moves = dist + 6;
+                undoMoves = 6;
                 break;
             case 2:
-                dimension = 10;
+                dimension = 15;
+                moves = dist + 2;
+                undoMoves = 4;
                 break;
             case 3:
-                dimension = 15;
+                dimension = 12;
+                moves = dist;
+                undoMoves = 1;
                 break;
         }
         head = nullptr;
         tail = nullptr;
+    }
+
+    void setting_distance_differences()
+    {
+        player_key_dist =
+            cityBlockDistance(player->X, player->Y, key.key_x, key.key_y);
+        player_door_dist =
+            cityBlockDistance(player->X, player->Y, door.door_x, door.door_y);
+        int key_door_dist =
+            cityBlockDistance(key.key_x, key.key_y, door.door_x, door.door_y);
     }
 
     void makGrid()
@@ -169,11 +200,10 @@ class Grid
     void displayGrid()
     {
         cout << "\n\t\tLEVEL: " << level;
-        // cout << "\n\n\tRemaining Moves: " << moves - player->move_no
-        //      << "\tRemaining Undo Moves: " << undoMoves -
-        //      player->undoMove_no;
-        // cout << "\n\tScore: " << score << "\tkey status: " << key.status;
-        // hintSystem();
+        cout << "\n\n\tRemaining Moves: " << moves - player->move_no
+             << "\tRemaining Undo Moves: " << undoMoves - player->undoMove_no;
+        cout << "\n\tScore: " << score << "\tkey status: " << key.status;
+        hintSystem();
 
         GridCell *row = head;
         while (row != nullptr)
@@ -182,10 +212,10 @@ class Grid
             GridCell *col = row;
             while (col != nullptr)
             {
-                cout << col->data << "\t";
+                cout << col->data << " ";
                 col = col->right;
             }
-            cout << endl << endl;
+            cout << endl;
             row = row->down;
         }
     }
@@ -201,19 +231,15 @@ class Grid
 
     void hintSystem()
     {
-        int dist =
-            cityBlockDistance(player->X, player->Y, key.key_x, key.key_y);
+        if (player_key_dist <= 3)
+            cout << "Getting Closer";
+        else
+            cout << "Further Away";
     }
 };
 
 int main()
 {
-    // Initialize PDCurses
-    // initscr();               // Start curses mode
-    // printw("Hello, World!"); // Print message to screen
-    // refresh();               // Refresh to show the message
-    // getch();                 // Wait for user input
-    // endwin();                // End curses mode
     Grid G(1);
     G.makGrid();
     G.displayGrid();

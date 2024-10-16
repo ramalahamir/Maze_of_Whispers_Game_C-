@@ -88,13 +88,16 @@ class Grid
     Player *player;
     Door door;
 
+    // keeps track of the players old position
+    GridCell *player_prevPos;
+
     int seed; // for the random function
 
     Grid(int lvl)
     {
-        seed = 123;
         level = lvl;
         player = new Player();
+        player_prevPos = nullptr;
 
         // setting the dimension
         switch (level)
@@ -109,6 +112,9 @@ class Grid
                 dimension = 12;
                 break;
         }
+
+        // generating seed
+        seed = 5678 / dimension;
 
         // setting the random positions for player, key and door
         key.key_x = random();
@@ -173,6 +179,14 @@ class Grid
                 // setting the up and down boundaries
                 if (i == 0 || j == 0 || i == rows - 1 || j == cols - 1)
                     cell = new GridCell(i, j, '#');
+
+                // setting the player on the grid
+                else if (i == player->X && j == player->Y)
+                {
+                    cell = new GridCell(i, j, 'P');
+                    player_prevPos = cell;
+                }
+
                 // regular cell
                 else
                     cell = new GridCell(i, j, '.');
@@ -222,6 +236,33 @@ class Grid
         }
     }
 
+    // overwrites the grid cells to show updated position
+    void adjustingPlayer_onGrid()
+    {
+        // previous osition is filled with .
+        player_prevPos->data = '.';
+
+        // if player moved up
+        if (player->X == player_prevPos->row - 1)
+            player_prevPos->up->data = 'P';
+
+        // if player moved down
+        else if (player->X == player_prevPos->row + 1)
+            player_prevPos->down->data = 'P';
+
+        // if player moved left
+        else if (player->Y == player_prevPos->col - 1)
+            player_prevPos->left->data = 'P';
+
+        // if player moved right
+        else if (player->Y == player_prevPos->col + 1)
+            player_prevPos->right->data = 'P';
+
+        // no change in position
+        else
+            player_prevPos->data = 'P';
+    }
+
     void displayGrid()
     {
         clear();
@@ -232,7 +273,11 @@ class Grid
                  undoMoves - player->undoMove_no);
         mvprintw(3, 30, "Score: %d", score);
         mvprintw(3, 80, "key status:  %d", key.status);
+
         hintSystem();
+
+        // player's new position updation
+        adjustingPlayer_onGrid();
 
         GridCell *row = head;
         int x = 7;
@@ -271,7 +316,7 @@ class Grid
 
     int random()
     {
-        int a = 11223344;
+        int a = 1122;
         int c = 12345;
         // using LCG formula
         seed = (a * seed + c) % dimension;

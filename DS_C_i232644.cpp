@@ -224,25 +224,29 @@ class Grid
 
     void displayGrid()
     {
-        cout << "\n\t\t\t\tLEVEL: " << level;
-        cout << "\n\n\tRemaining Moves: " << moves - player->move_no
-             << "\t\tRemaining Undo Moves: " << undoMoves - player->undoMove_no;
-        cout << "\n\tScore: " << score << "\t\t\tkey status: " << key.status;
+        clear();
+
+        mvprintw(1, 60, "LEVEL: %d", level);
+        mvprintw(2, 30, "Remaining Moves: %d", moves - player->move_no);
+        mvprintw(2, 80, "Remaining Undo Moves: %d",
+                 undoMoves - player->undoMove_no);
+        mvprintw(3, 30, "Score: %d", score);
+        mvprintw(3, 80, "key status:  %d", key.status);
         hintSystem();
 
-        cout << endl;
-
         GridCell *row = head;
+        int x = 7;
         while (row != nullptr)
         {
-            cout << "\n\t\t";
+            int y = 45;
             GridCell *col = row;
             while (col != nullptr)
             {
-                cout << col->data << "   ";
+                mvprintw(x, y, "%c", col->data);
                 col = col->right;
+                y += 3; // incrementing col pos
             }
-            cout << endl;
+            x += 1; // incremeting row pos
             row = row->down;
         }
     }
@@ -258,11 +262,11 @@ class Grid
 
     void hintSystem()
     {
-        cout << "\n\n\tHINT: ";
+        mvprintw(5, 30, "HINT: ");
         if (player_key_dist <= 3)
-            cout << "Getting Closer";
+            mvprintw(5, 50, "Getting Closer");
         else
-            cout << "Further Away";
+            mvprintw(5, 50, "Further Away");
     }
 
     int random()
@@ -277,8 +281,15 @@ class Grid
 
 int main()
 {
+    initscr(); // Initialize the screen
+
     Grid G(1);
     G.makGrid();
     G.displayGrid();
+
+    refresh(); // Refreshes the screen to see the updates
+    getch();
+    endwin();
+    // endwin() ends the "curses mode" and brings the terminal back to normal
     return 0;
 }

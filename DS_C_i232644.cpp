@@ -1,5 +1,4 @@
-// #include
-// "C:\\Users\\Administrator\\OneDrive\\Desktop\\university\\dataStructures\\PDCurses_library\\curses.h"
+#include "C:/Users/Administrator/vcpkg/installed/x64-windows/include/curses.h"
 #include <iostream>
 
 using namespace std;
@@ -30,6 +29,7 @@ struct Key
     int key_x;
     int key_y;
     char symb = 'K';
+    bool status = false;
 };
 
 struct Door
@@ -54,16 +54,33 @@ struct Bomb
     char symb = 'B';
 };
 
+class Player
+{
+  public:
+    int move_no;
+    int undoMove_no;
+    int total_moves;
+    int total_undo;
+
+    int X;
+    int Y;
+};
+
 class Grid
 {
   public:
     GridCell *head;
     GridCell *tail;
+
     int level;
     int dimension;
     int moves;
     int undoMoves;
+    int score;
+
     Key key;
+    Player *player;
+    Door door;
 
     Grid(int lvl)
     {
@@ -151,14 +168,21 @@ class Grid
 
     void displayGrid()
     {
+        cout << "\n\t\tLEVEL: " << level;
+        // cout << "\n\n\tRemaining Moves: " << moves - player->move_no
+        //      << "\tRemaining Undo Moves: " << undoMoves -
+        //      player->undoMove_no;
+        // cout << "\n\tScore: " << score << "\tkey status: " << key.status;
+        // hintSystem();
+
         GridCell *row = head;
         while (row != nullptr)
         {
-            cout << "\t\t";
+            cout << "\n\t\t";
             GridCell *col = row;
             while (col != nullptr)
             {
-                cout << col->data << "    ";
+                cout << col->data << "\t";
                 col = col->right;
             }
             cout << endl << endl;
@@ -173,6 +197,12 @@ class Grid
 
         int dist = mod_x + mod_y;
         return dist;
+    }
+
+    void hintSystem()
+    {
+        int dist =
+            cityBlockDistance(player->X, player->Y, key.key_x, key.key_y);
     }
 };
 

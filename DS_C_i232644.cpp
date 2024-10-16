@@ -65,12 +65,7 @@ class Player
     int X;
     int Y;
 
-    Player(int movesAllowed, int undoMovesAllowed)
-    {
-        move_no = undoMove_no = 0;
-        total_moves = movesAllowed;
-        total_undo = undoMovesAllowed;
-    }
+    Player() { move_no = undoMove_no = 0; }
 };
 
 class Grid
@@ -93,31 +88,61 @@ class Grid
     Player *player;
     Door door;
 
+    int seed; // for the random function
+
     Grid(int lvl)
     {
-        // calculating distance differences for player, key and door
-        setting_distance_differences();
-        int dist = player_door_dist + player_key_dist + key_door_dist;
-
+        seed = 123;
         level = lvl;
+        player = new Player();
+
+        // setting the dimension
         switch (level)
         {
             case 1:
                 dimension = 10;
+                break;
+            case 2:
+                dimension = 15;
+                break;
+            case 3:
+                dimension = 12;
+                break;
+        }
+
+        // setting the random positions for player, key and door
+        key.key_x = random();
+        key.key_y = random();
+        player->X = random();
+        player->Y = random();
+        door.door_x = random();
+        door.door_y = random();
+
+        // calculating distance differences for player, key and door
+        setting_distance_differences();
+        int dist = player_door_dist + player_key_dist + key_door_dist;
+
+        // setting the moves
+        switch (level)
+        {
+            case 1:
                 moves = dist + 6;
                 undoMoves = 6;
                 break;
             case 2:
-                dimension = 15;
                 moves = dist + 2;
                 undoMoves = 4;
                 break;
             case 3:
-                dimension = 12;
                 moves = dist;
                 undoMoves = 1;
                 break;
         }
+
+        // setting for player object
+        player->total_moves = moves;
+        player->total_undo = undoMoves;
+
         head = nullptr;
         tail = nullptr;
     }
@@ -199,11 +224,13 @@ class Grid
 
     void displayGrid()
     {
-        cout << "\n\t\tLEVEL: " << level;
+        cout << "\n\t\t\t\tLEVEL: " << level;
         cout << "\n\n\tRemaining Moves: " << moves - player->move_no
-             << "\tRemaining Undo Moves: " << undoMoves - player->undoMove_no;
-        cout << "\n\tScore: " << score << "\tkey status: " << key.status;
+             << "\t\tRemaining Undo Moves: " << undoMoves - player->undoMove_no;
+        cout << "\n\tScore: " << score << "\t\t\tkey status: " << key.status;
         hintSystem();
+
+        cout << endl;
 
         GridCell *row = head;
         while (row != nullptr)
@@ -212,7 +239,7 @@ class Grid
             GridCell *col = row;
             while (col != nullptr)
             {
-                cout << col->data << " ";
+                cout << col->data << "   ";
                 col = col->right;
             }
             cout << endl;
@@ -231,10 +258,20 @@ class Grid
 
     void hintSystem()
     {
+        cout << "\n\n\tHINT: ";
         if (player_key_dist <= 3)
             cout << "Getting Closer";
         else
             cout << "Further Away";
+    }
+
+    int random()
+    {
+        int a = 11223344;
+        int c = 12345;
+        // using LCG formula
+        seed = (a * seed + c) % dimension;
+        return seed;
     }
 };
 

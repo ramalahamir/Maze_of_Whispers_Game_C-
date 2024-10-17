@@ -24,6 +24,23 @@ class GridCell
     }
 };
 
+// making Node and list library for stack
+struct Node
+{
+    int row;
+    int col;
+    int data;
+    Node *next;
+
+    Node(int r, int c, int val)
+    {
+        row = r;
+        col = c;
+        data = val;
+        next = nullptr;
+    }
+};
+
 struct Key
 {
     int key_x;
@@ -66,6 +83,66 @@ class Player
     int Y;
 
     Player() { move_no = undoMove_no = 0; }
+    void movement() {}
+};
+
+class UndoStack
+{
+  public:
+    Node *top;
+    int size;
+    int capacity;
+
+    UndoStack(int undoMoves)
+    {
+        top = nullptr;
+        capacity = undoMoves;
+        size = 0;
+    }
+
+    void Push(int data, int row, int col)
+    {
+        Node *temp = new Node(row, col, data);
+
+        // if capacity full
+        if (size == capacity)
+            return;
+
+        if (isEmpty())
+            top = temp;
+        else
+        {
+            temp->next = top;
+            top = temp;
+        }
+        size++;
+    }
+
+    int Pop()
+    {
+        if (isEmpty())
+            return -1;
+
+        int pop = top->data;
+
+        Node *temp = top;
+        top = top->next;
+        delete temp;
+
+        // size will NOT decrement because undo moves are fixed
+        // once used the node cannot be overwritten!
+
+        return pop;
+    }
+
+    int peek()
+    {
+        if (isEmpty())
+            return -1;
+        return top->data;
+    }
+
+    bool isEmpty() { return top == nullptr; }
 };
 
 class Grid
@@ -96,6 +173,7 @@ class Grid
     Grid(int lvl)
     {
         level = lvl;
+        score = 0;
         player = new Player();
         player_prevPos = nullptr;
 
@@ -159,7 +237,7 @@ class Grid
             cityBlockDistance(player->X, player->Y, key.key_x, key.key_y);
         player_door_dist =
             cityBlockDistance(player->X, player->Y, door.door_x, door.door_y);
-        int key_door_dist =
+        key_door_dist =
             cityBlockDistance(key.key_x, key.key_y, door.door_x, door.door_y);
     }
 

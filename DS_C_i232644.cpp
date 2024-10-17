@@ -24,18 +24,30 @@ class GridCell
     }
 };
 
-// making Node and list library for stack
-struct Node
+struct coordinates
 {
     int row;
     int col;
+
+    coordinates() {}
+    coordinates(int x, int y)
+    {
+        row = x;
+        col = y;
+    }
+};
+
+// making Node and list library for stack
+struct Node
+{
+    coordinates cor;
     int data;
     Node *next;
 
     Node(int r, int c, int val)
     {
-        row = r;
-        col = c;
+        cor.row = r;
+        cor.col = c;
         data = val;
         next = nullptr;
     }
@@ -71,21 +83,6 @@ struct Bomb
     char symb = 'B';
 };
 
-class Player
-{
-  public:
-    int move_no;
-    int undoMove_no;
-    int total_moves;
-    int total_undo;
-
-    int X;
-    int Y;
-
-    Player() { move_no = undoMove_no = 0; }
-    void movement() {}
-};
-
 class UndoStack
 {
   public:
@@ -118,12 +115,12 @@ class UndoStack
         size++;
     }
 
-    int Pop()
+    coordinates Pop()
     {
         if (isEmpty())
-            return -1;
+            return coordinates(-1, -1);
 
-        int pop = top->data;
+        coordinates pop = top->cor;
 
         Node *temp = top;
         top = top->next;
@@ -135,14 +132,132 @@ class UndoStack
         return pop;
     }
 
-    int peek()
+    coordinates peek(int n = 0)
     {
         if (isEmpty())
-            return -1;
-        return top->data;
+            return coordinates(-1, -1);
+
+        // peek into a specific level
+        Node *temp = top;
+        for (int i = 0; i < n; i++)
+        {
+            temp = temp->next;
+        }
+        return temp->cor;
     }
 
     bool isEmpty() { return top == nullptr; }
+    bool isFull() { return size == capacity; }
+};
+
+class Player
+{
+  public:
+    // counter
+    int move_no;
+    int undoMove_no;
+    // limits
+    int total_moves;
+    int total_undo;
+
+    int X;
+    int Y;
+
+    Player() { move_no = 0; }
+
+    // parameters:
+    // Xcor is sent to adjust the position of prompt display
+    // previous position of player
+
+    void movement(int grid_Xcor, UndoStack *&stack)
+    {
+        mvprintw(grid_Xcor + 2, 30,
+                 "enter movement : (using up, down, left, right arrowkeys  or "
+                 " press u for undo or "
+                 " press esc to quit): ");
+        int input;
+        bool polarOpposite = false;
+
+        // temprorary storage for new val
+        int new_x;
+        int new_y;
+
+        // get the current move
+        coordinates cor = stack->peek();
+
+        // get the move before the current (top)
+        coordinates prev_cor = stack->peek(1);
+
+        switch (input)
+        {
+            case KEY_UP:
+                new_x = cor.row - 1;
+                new_y = cor.col;
+                break;
+
+            case KEY_DOWN:
+                new_x = cor.row + 1;
+                new_y = cor.col;
+                break;
+
+            case KEY_LEFT:
+                new_x = cor.row;
+                new_y = cor.col - 1;
+                break;
+
+            case KEY_RIGHT:
+                new_x = cor.row;
+                new_y = cor.col + 1;
+                break;
+
+            // esc key pressed
+            case 27:
+                // exit the game
+                endwin();
+                break;
+
+            default:
+                mvprintw(grid_Xcor + 3, 50, "invalid move!");
+                break;
+        }
+
+        // check if new move isn't polar opposite to the current move
+        if (new_x == prev_cor.row && new_y == prev_cor.col)
+        {
+            mvprintw(grid_Xcor + 3, 50, "invalid move!");
+            polarOpposite = true;
+        }
+        else
+        {
+            X = new_x;
+            Y = new_y;
+        }
+
+        // restriction on sudden pack paddle movement handling
+        if (polarOpposite)
+        {
+            mvprintw(grid_Xcor + 4, 50, "you cannot move back unless its undo");
+            mvprintw(grid_Xcor + 4, 50, "do you want it to be undo? (y/n):");
+            char ch = getch();
+            if (ch == 'y' || 'Y')
+                input = 'U';
+        }
+
+        // undo movement
+        if (input == 'u' || input == 'U')
+        {
+
+            // popping the current move
+            coordinates prev_move = stack->Pop();
+
+            // now pop the last move (used for undo)
+            prev_move = stack->Pop();
+
+            // new move will be the previous move
+            X = prev_move.row;
+            Y = prev_move.col;
+        }
+    }
 };
 
 class Grid
@@ -167,8 +282,13 @@ class Grid
 
     // keeps track of the players old position
     GridCell *player_prevPos;
+    UndoStack *stack;
 
     int seed; // for the random function
+
+    // starting grid X cor and Ycor on screen
+    // this will be stored for display setting purposes
+    int grid_Xcor, grid_Ycor;
 
     Grid(int lvl)
     {
@@ -227,6 +347,9 @@ class Grid
         player->total_moves = moves;
         player->total_undo = undoMoves;
 
+        // intitalizing stack size
+        stack = new UndoStack(undoMoves);
+
         head = nullptr;
         tail = nullptr;
     }
@@ -263,6 +386,8 @@ class Grid
                 {
                     cell = new GridCell(i, j, 'P');
                     player_prevPos = cell;
+                    stack->Push(player_prevPos->data, player_prevPos->row,
+                                player_prevPos->col);
                 }
 
                 // regular cell
@@ -339,6 +464,14 @@ class Grid
         // no change in position
         else
             player_prevPos->data = 'P';
+
+        // update the players new posiion as prev
+        player_prevPos->row = player->X;
+        player_prevPos->col = player->Y;
+
+        // pushing it into the stack
+        stack->Push(player_prevPos->data, player_prevPos->row,
+                    player_prevPos->col);
     }
 
     void displayGrid()
@@ -358,18 +491,18 @@ class Grid
         adjustingPlayer_onGrid();
 
         GridCell *row = head;
-        int x = 7;
+        grid_Xcor = 7;
         while (row != nullptr)
         {
-            int y = 45;
+            grid_Ycor = 45;
             GridCell *col = row;
             while (col != nullptr)
             {
-                mvprintw(x, y, "%c", col->data);
+                mvprintw(grid_Xcor, grid_Ycor, "%c", col->data);
                 col = col->right;
-                y += 3; // incrementing col pos
+                grid_Ycor += 3; // incrementing col pos
             }
-            x += 1; // incremeting row pos
+            grid_Xcor += 1; // incremeting row pos
             row = row->down;
         }
     }
@@ -405,6 +538,11 @@ class Grid
 int main()
 {
     initscr(); // Initialize the screen
+
+    // for taking keyboard inputs
+    keypad(stdscr,
+           TRUE); // for capturing special keys like arrow keys
+    noecho();     // Don't echo the input
 
     Grid G(1);
     G.makGrid();

@@ -85,25 +85,22 @@ struct Bomb
 
 class UndoStack
 {
+    int size;
+    int total_undo;
+
   public:
     Node *top;
-    int size;
-    int capacity;
 
     UndoStack(int undoMoves)
     {
         top = nullptr;
-        capacity = undoMoves;
-        size = 0;
+        size = 0;               // counter
+        total_undo = undoMoves; // specific number of popping allowed!
     }
 
     void Push(int data, int row, int col)
     {
         Node *temp = new Node(row, col, data);
-
-        // if capacity full
-        if (size == capacity)
-            return;
 
         if (isEmpty())
             top = temp;
@@ -112,12 +109,11 @@ class UndoStack
             temp->next = top;
             top = temp;
         }
-        size++;
     }
 
     coordinates Pop()
     {
-        if (isEmpty())
+        if (isEmpty() || size == total_undo)
             return coordinates(-1, -1);
 
         coordinates pop = top->cor;
@@ -126,9 +122,7 @@ class UndoStack
         top = top->next;
         delete temp;
 
-        // size will NOT decrement because undo moves are fixed
-        // once used the node cannot be overwritten!
-
+        size++; // counter for no of undomoves
         return pop;
     }
 
@@ -139,15 +133,44 @@ class UndoStack
 
         // peek into a specific level
         Node *temp = top;
-        for (int i = 0; i < n; i++)
+        for (int i = 0; i <= n; i++)
         {
+            if (temp->next == nullptr)
+                break;
             temp = temp->next;
         }
         return temp->cor;
     }
 
     bool isEmpty() { return top == nullptr; }
-    bool isFull() { return size == capacity; }
+    int undoMovesLeft() { return size; }
+
+    // displaying stack
+    void display()
+    {
+        if (isEmpty())
+        {
+            mvprintw(1, 100, "Stack is empty.");
+            refresh(); // Refresh the screen to show changes
+            return;
+        }
+
+        mvprintw(1, 100, "player move history (x, y):");
+        refresh(); // Refresh after printing header
+
+        Node *temp = top;
+        int line = 2; // Start displaying from row 2
+
+        while (temp != nullptr)
+        {
+            // Print the row and col of each node in the stack
+            mvprintw(line, 105, "(%d, %d)", temp->cor.row, temp->cor.col);
+            line++; // Move to the next line for the next node
+            temp = temp->next;
+        }
+
+        refresh(); // Refresh to update the screen with the final output
+    }
 };
 
 class Player
@@ -155,109 +178,12 @@ class Player
   public:
     // counter
     int move_no;
-    int undoMove_no;
-    // limits
-    int total_moves;
-    int total_undo;
 
+    // player coordinates
     int X;
     int Y;
 
     Player() { move_no = 0; }
-
-    // parameters:
-    // Xcor is sent to adjust the position of prompt display
-    // previous position of player
-
-    void movement(int grid_Xcor, UndoStack *&stack)
-    {
-        mvprintw(grid_Xcor + 2, 30,
-                 "enter movement : (using up, down, left, right arrowkeys  or "
-                 " press u for undo or "
-                 " press esc to quit): ");
-        int input;
-        bool polarOpposite = false;
-
-        // temprorary storage for new val
-        int new_x;
-        int new_y;
-
-        // get the current move
-        coordinates cor = stack->peek();
-
-        // get the move before the current (top)
-        coordinates prev_cor = stack->peek(1);
-
-        switch (input)
-        {
-            case KEY_UP:
-                new_x = cor.row - 1;
-                new_y = cor.col;
-                break;
-
-            case KEY_DOWN:
-                new_x = cor.row + 1;
-                new_y = cor.col;
-                break;
-
-            case KEY_LEFT:
-                new_x = cor.row;
-                new_y = cor.col - 1;
-                break;
-
-            case KEY_RIGHT:
-                new_x = cor.row;
-                new_y = cor.col + 1;
-                break;
-
-            // esc key pressed
-            case 27:
-                // exit the game
-                endwin();
-                break;
-
-            default:
-                mvprintw(grid_Xcor + 3, 50, "invalid move!");
-                break;
-        }
-
-        // check if new move isn't polar opposite to the current move
-        if (new_x == prev_cor.row && new_y == prev_cor.col)
-        {
-            mvprintw(grid_Xcor + 3, 50, "invalid move!");
-            polarOpposite = true;
-        }
-        else
-        {
-            X = new_x;
-            Y = new_y;
-        }
-
-        // restriction on sudden pack paddle movement handling
-        if (polarOpposite)
-        {
-            mvprintw(grid_Xcor + 4, 50, "you cannot move back unless its undo");
-            mvprintw(grid_Xcor + 4, 50, "do you want it to be undo? (y/n):");
-            char ch = getch();
-            if (ch == 'y' || 'Y')
-                input = 'U';
-        }
-
-        // undo movement
-        if (input == 'u' || input == 'U')
-        {
-
-            // popping the current move
-            coordinates prev_move = stack->Pop();
-
-            // now pop the last move (used for undo)
-            prev_move = stack->Pop();
-
-            // new move will be the previous move
-            X = prev_move.row;
-            Y = prev_move.col;
-        }
-    }
 };
 
 class Grid
@@ -312,7 +238,7 @@ class Grid
         }
 
         // generating seed
-        seed = 5678 / dimension;
+        seed = 235 / dimension;
 
         // setting the random positions for player, key and door
         key.key_x = random();
@@ -342,10 +268,6 @@ class Grid
                 undoMoves = 1;
                 break;
         }
-
-        // setting for player object
-        player->total_moves = moves;
-        player->total_undo = undoMoves;
 
         // intitalizing stack size
         stack = new UndoStack(undoMoves);
@@ -439,9 +361,124 @@ class Grid
         }
     }
 
+    void player_movement(int input)
+    {
+        bool polarOpposite = false;
+        bool invalid_move = false;
+
+        // temprorary storage for new val
+        int new_x;
+        int new_y;
+
+        // get the current move
+        coordinates cor = stack->peek();
+
+        // get the move before the current (top)
+        coordinates prev_cor = stack->peek(1);
+
+        switch (input)
+        {
+            // UP
+            case 'w':
+            case 'W':
+                new_x = cor.row - 1;
+                new_y = cor.col;
+                break;
+
+            // DOWN
+            case 's':
+            case 'S':
+                new_x = cor.row + 1;
+                new_y = cor.col;
+                break;
+
+            // LEFT
+            case 'a':
+            case 'A':
+                new_x = cor.row;
+                new_y = cor.col - 1;
+                break;
+
+            // RIGHT
+            case 'd':
+            case 'D':
+                new_x = cor.row;
+                new_y = cor.col + 1;
+                break;
+
+            // if undo simply break
+            case 'u':
+            case 'U':
+                break;
+
+            default:
+                invalid_move = true;
+                break;
+        }
+
+        // check if the new coordinate isn't boundary
+        if (new_x == 0 || new_x == dimension + 2 || new_y == 0 ||
+            new_y == dimension + 2)
+            invalid_move = true;
+
+        // key obtained
+        // if keyStatus true then door reached
+        // coin score++
+        // bomb gameover
+
+        // check if new move isn't polar opposite to the current move
+        if (new_x == prev_cor.row && new_y == prev_cor.col)
+        {
+            invalid_move = true;
+            polarOpposite = true;
+        }
+        else
+        {
+            player->X = new_x;
+            player->Y = new_y;
+        }
+
+        // restriction on sudden pack paddle movement handling
+        if (polarOpposite)
+        {
+            mvprintw(grid_Xcor + 5, 20, "you cannot move back unless its undo");
+            mvprintw(grid_Xcor + 5, 20, "do you want it to be undo? (y/n):");
+            char ch = getch();
+            if (ch == 'y' || 'Y')
+                input = 'U';
+            refresh();
+        }
+
+        // undo movement
+        if (input == 'u' || input == 'U')
+        {
+            // popping the current move
+            coordinates prev_move = stack->Pop();
+
+            // now pop the last move (used for undo)
+            prev_move = stack->Pop();
+
+            // new move will be the previous move
+            player->X = prev_move.row;
+            player->Y = prev_move.col;
+        }
+
+        if (invalid_move)
+        {
+            mvprintw(grid_Xcor + 4, 20, "invalid move!");
+            refresh();
+        }
+
+        // pushing the new ,move into the stack
+        stack->Push('P', player->X, player->Y);
+    }
+
     // overwrites the grid cells to show updated position
     void adjustingPlayer_onGrid()
     {
+        // assuming movement occurs
+        bool change = true;
+
         // previous osition is filled with .
         player_prevPos->data = '.';
 
@@ -463,27 +500,33 @@ class Grid
 
         // no change in position
         else
+        {
             player_prevPos->data = 'P';
+            change = false;
+        }
 
-        // update the players new posiion as prev
+        // // only when change occurs
+        // if (change)
+        // {
+        //     // update the players new posiion as prev
         player_prevPos->row = player->X;
         player_prevPos->col = player->Y;
 
         // pushing it into the stack
-        stack->Push(player_prevPos->data, player_prevPos->row,
-                    player_prevPos->col);
+        //     stack->Push(player_prevPos->data, player_prevPos->row,
+        //                 player_prevPos->col);
+        // }
     }
 
     void displayGrid()
     {
-        clear();
-
-        mvprintw(1, 60, "LEVEL: %d", level);
-        mvprintw(2, 30, "Remaining Moves: %d", moves - player->move_no);
-        mvprintw(2, 80, "Remaining Undo Moves: %d",
-                 undoMoves - player->undoMove_no);
-        mvprintw(3, 30, "Score: %d", score);
-        mvprintw(3, 80, "key status:  %d", key.status);
+        // clear();
+        mvprintw(1, 50, "LEVEL: %d", level);
+        mvprintw(2, 20, "Remaining Moves: %d", moves - player->move_no);
+        mvprintw(2, 70, "Remaining Undo Moves: %d",
+                 undoMoves - stack->undoMovesLeft());
+        mvprintw(3, 20, "Score: %d", score);
+        mvprintw(3, 70, "key status: %s", (key.status == 1 ? "True" : "False"));
 
         hintSystem();
 
@@ -494,7 +537,7 @@ class Grid
         grid_Xcor = 7;
         while (row != nullptr)
         {
-            grid_Ycor = 45;
+            grid_Ycor = 35;
             GridCell *col = row;
             while (col != nullptr)
             {
@@ -505,6 +548,10 @@ class Grid
             grid_Xcor += 1; // incremeting row pos
             row = row->down;
         }
+        mvprintw(grid_Xcor + 2, 10,
+                 "using up, down, left, right arrowkeys  or "
+                 " press u for undo or "
+                 " press esc to quit): ");
     }
 
     int cityBlockDistance(int x1, int y1, int x2, int y2)
@@ -518,11 +565,11 @@ class Grid
 
     void hintSystem()
     {
-        mvprintw(5, 30, "HINT: ");
+        mvprintw(5, 20, "HINT: ");
         if (player_key_dist <= 3)
-            mvprintw(5, 50, "Getting Closer");
+            mvprintw(5, 40, "Getting Closer");
         else
-            mvprintw(5, 50, "Further Away");
+            mvprintw(5, 40, "Further Away");
     }
 
     int random()
@@ -539,17 +586,28 @@ int main()
 {
     initscr(); // Initialize the screen
 
-    // for taking keyboard inputs
-    keypad(stdscr,
-           TRUE); // for capturing special keys like arrow keys
-    noecho();     // Don't echo the input
-
     Grid G(1);
     G.makGrid();
-    G.displayGrid();
+    G.stack->display();
 
-    refresh(); // Refreshes the screen to see the updates
-    getch();
+    int input;
+    do
+    {
+        refresh(); // Refreshes the screen to see the updates
+
+        // displaying grid
+        G.displayGrid();
+
+        // asking for user input
+        mvprintw(G.grid_Xcor + 4, 10, "enter movement : ");
+        input = getch();
+
+        // player movement
+        G.player_movement(input);
+        G.stack->display();
+
+    } while (input != 27); // i.e esc key
+
     endwin();
     // endwin() ends the "curses mode" and brings the terminal back to normal
     return 0;

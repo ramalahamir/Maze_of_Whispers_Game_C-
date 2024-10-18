@@ -184,6 +184,7 @@ class Player
     int Y;
 
     Player() { move_no = 0; }
+    void increment_move_no() { move_no++; }
 };
 
 class Grid
@@ -366,156 +367,139 @@ class Grid
         bool polarOpposite = false;
         bool invalid_move = false;
 
-        // temprorary storage for new val
-        int new_x;
-        int new_y;
+        // temporary storage for new values
+        int new_x = player->X;
+        int new_y = player->Y;
 
-        // get the current move
-        coordinates cor = stack->peek();
-
-        // get the move before the current (top)
-        coordinates prev_cor = stack->peek(1);
+        // store the direction of the last move
+        static char last_move = '0'; // 'w', 's', 'a', 'd' for directions
 
         switch (input)
         {
             // UP
             case 'w':
             case 'W':
-                new_x = cor.row - 1;
-                new_y = cor.col;
+                if (last_move == 's') // if the last move was down
+                    polarOpposite = true;
+                new_x = player->X - 1;
                 break;
 
             // DOWN
             case 's':
             case 'S':
-                new_x = cor.row + 1;
-                new_y = cor.col;
+                if (last_move == 'w') // if the last move was up
+                    polarOpposite = true;
+                new_x = player->X + 1;
                 break;
 
             // LEFT
             case 'a':
             case 'A':
-                new_x = cor.row;
-                new_y = cor.col - 1;
+                if (last_move == 'd') // if the last move was right
+                    polarOpposite = true;
+                new_y = player->Y - 1;
                 break;
 
             // RIGHT
             case 'd':
             case 'D':
-                new_x = cor.row;
-                new_y = cor.col + 1;
+                if (last_move == 'a') // if the last move was left
+                    polarOpposite = true;
+                new_y = player->Y + 1;
                 break;
 
-            // if undo simply break
+            // Undo movement
             case 'u':
             case 'U':
-                break;
+            {
+                coordinates prev_move = stack->Pop();
+                if (prev_move.row != -1 &&
+                    prev_move.col != -1) // for the initial case
+                {
+                    player->X = prev_move.row;
+                    player->Y = prev_move.col;
+                }
+                return; // return control
+            }
 
             default:
                 invalid_move = true;
                 break;
         }
 
-        // check if the new coordinate isn't boundary
-        if (new_x == 0 || new_x == dimension + 2 || new_y == 0 ||
-            new_y == dimension + 2)
+        // Check if move is within grid boundaries
+        if (new_x == 0 || new_x == dimension + 1 || new_y == 0 ||
+            new_y == dimension + 1)
             invalid_move = true;
 
-        // key obtained
-        // if keyStatus true then door reached
-        // coin score++
-        // bomb gameover
-
-        // check if new move isn't polar opposite to the current move
-        if (new_x == prev_cor.row && new_y == prev_cor.col)
-        {
-            invalid_move = true;
-            polarOpposite = true;
-        }
-        else
-        {
-            player->X = new_x;
-            player->Y = new_y;
-        }
-
-        // restriction on sudden pack paddle movement handling
+        // If the move is polar opposite, don't allow it without undo
         if (polarOpposite)
         {
-            mvprintw(grid_Xcor + 5, 20, "you cannot move back unless its undo");
-            mvprintw(grid_Xcor + 5, 20, "do you want it to be undo? (y/n):");
-            char ch = getch();
-            if (ch == 'y' || 'Y')
-                input = 'U';
+            mvprintw(grid_Xcor + 5, 20,
+                     "You cannot move back without undo. Press 'u' to undo.");
             refresh();
-        }
-
-        // undo movement
-        if (input == 'u' || input == 'U')
-        {
-            // popping the current move
-            coordinates prev_move = stack->Pop();
-
-            // now pop the last move (used for undo)
-            prev_move = stack->Pop();
-
-            // new move will be the previous move
-            player->X = prev_move.row;
-            player->Y = prev_move.col;
+            invalid_move = true;
         }
 
         if (invalid_move)
         {
-            mvprintw(grid_Xcor + 4, 20, "invalid move!");
+            mvprintw(grid_Xcor + 5, 20, "Invalid move!");
             refresh();
+            return; // again return
         }
 
-        // pushing the new ,move into the stack
+        // Update player position if valid move
+        player->X = new_x;
+        player->Y = new_y;
+        player->increment_move_no();
+
+        // Push the new move onto the stack
         stack->Push('P', player->X, player->Y);
+
+        // Update the last move to the current direction
+        last_move = input;
     }
 
     // overwrites the grid cells to show updated position
     void adjustingPlayer_onGrid()
     {
-        // assuming movement occurs
-        bool change = true;
-
         // previous osition is filled with .
         player_prevPos->data = '.';
 
         // if player moved up
         if (player->X == player_prevPos->row - 1)
+        {
             player_prevPos->up->data = 'P';
+            // update the players new posiion as prev
+            player_prevPos = player_prevPos->up;
+        }
 
         // if player moved down
         else if (player->X == player_prevPos->row + 1)
+        {
             player_prevPos->down->data = 'P';
+            // update the players new posiion as prev
+            player_prevPos = player_prevPos->down;
+        }
 
         // if player moved left
         else if (player->Y == player_prevPos->col - 1)
+        {
             player_prevPos->left->data = 'P';
+            // update the players new posiion as prev
+            player_prevPos = player_prevPos->left;
+        }
 
         // if player moved right
         else if (player->Y == player_prevPos->col + 1)
+        {
             player_prevPos->right->data = 'P';
-
+            // update the players new posiion as prev
+            player_prevPos = player_prevPos->right;
+        }
         // no change in position
         else
-        {
             player_prevPos->data = 'P';
-            change = false;
-        }
-
-        // // only when change occurs
-        // if (change)
-        // {
-        //     // update the players new posiion as prev
-        player_prevPos->row = player->X;
-        player_prevPos->col = player->Y;
-
-        // pushing it into the stack
-        //     stack->Push(player_prevPos->data, player_prevPos->row,
-        //                 player_prevPos->col);
-        // }
     }
 
     void displayGrid()
@@ -606,7 +590,8 @@ int main()
         G.player_movement(input);
         G.stack->display();
 
-    } while (input != 27); // i.e esc key
+    } while (input != 27 && G.player->move_no != G.moves);
+    // i.e esc key or moves are completed
 
     endwin();
     // endwin() ends the "curses mode" and brings the terminal back to normal

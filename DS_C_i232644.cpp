@@ -198,6 +198,7 @@ class Grid
     int moves;
     int undoMoves;
     int score;
+    int remaining_moves;
 
     int player_key_dist;
     int player_door_dist;
@@ -234,7 +235,7 @@ class Grid
                 dimension = 15;
                 break;
             case 3:
-                dimension = 12;
+                dimension = 20;
                 break;
         }
 
@@ -269,6 +270,8 @@ class Grid
                 undoMoves = 1;
                 break;
         }
+        // initially both are same
+        remaining_moves = moves;
 
         // intitalizing stack size
         stack = new UndoStack(undoMoves);
@@ -506,7 +509,8 @@ class Grid
     {
         // clear();
         mvprintw(1, 50, "LEVEL: %d", level);
-        mvprintw(2, 20, "Remaining Moves: %d", moves - player->move_no);
+        remaining_moves = player->move_no < moves ? moves - player->move_no : 0;
+        mvprintw(2, 20, "Remaining Moves: %d", remaining_moves);
         mvprintw(2, 70, "Remaining Undo Moves: %d",
                  undoMoves - stack->undoMovesLeft());
         mvprintw(3, 20, "Score: %d", score);
@@ -561,7 +565,7 @@ class Grid
         int a = 1122;
         int c = 12345;
         // using LCG formula
-        seed = (a * seed + c) % dimension;
+        seed = ((a * seed + c) % dimension) + 1;
         return seed;
     }
 };
@@ -570,12 +574,32 @@ int main()
 {
     initscr(); // Initialize the screen
 
-    Grid G(1);
+    // level adjustment menu
+    int level;
+    mvprintw(5, 50, "select level: ");
+    mvprintw(6, 50, "1. Easy ");
+    mvprintw(7, 50, "2. Medium ");
+    mvprintw(8, 50, "3. Hard ");
+    mvprintw(9, 50, "Enter 1,2,3: ");
+    level = getch() - '0'; // getch gets the assci code of the key pressed
+
+    // checking if valid input
+    if (level < 1 || level > 3)
+    {
+        mvprintw(10, 50, "Invalid input! Please enter 1, 2, or 3.");
+        refresh();
+        getch();
+        endwin();
+        return 0; // exits the game
+    }
+
+    Grid G(level);
+    clear(); // clear the screen before making the grid
     G.makGrid();
     G.stack->display();
 
     int input;
-    do
+    while (true)
     {
         refresh(); // Refreshes the screen to see the updates
 
@@ -588,10 +612,19 @@ int main()
 
         // player movement
         G.player_movement(input);
-        G.stack->display();
 
-    } while (input != 27 && G.player->move_no != G.moves);
-    // i.e esc key or moves are completed
+        // i.e esc key or moves are completed
+        if (input == 27 || G.remaining_moves == 0)
+        {
+            clear();
+            mvprintw(7, 50, "GAME OVER!");
+            getch();
+            break;
+        }
+
+        // display move history
+        G.stack->display();
+    }
 
     endwin();
     // endwin() ends the "curses mode" and brings the terminal back to normal

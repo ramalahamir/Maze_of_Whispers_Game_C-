@@ -68,6 +68,69 @@ struct Door
     char symb = 'D';
 };
 
+class Queue
+{
+  private:
+    Node *front, *rear;
+
+  public:
+    Queue() { front = rear = nullptr; }
+
+    bool isEmpty() { return front == nullptr; }
+
+    void enqueue(char data, int row, int col)
+    {
+        Node *newNode = new Node(data, row, col);
+        if (isEmpty())
+            front = rear = newNode;
+        else
+        {
+            rear->next = newNode;
+            rear = newNode;
+        }
+    }
+
+    void dequeue()
+    {
+        if (isEmpty())
+        {
+            cout << "\nQueue is empty";
+            return;
+        }
+        Node *temp = front;
+        front = front->next;
+        cout << "\nRemoving node... \nData: " << temp->data;
+        delete temp;
+    }
+
+    void displayQueue()
+    {
+        if (isEmpty())
+        {
+            cout << "\nQueue is empty";
+            return;
+        }
+        cout << "Queue: ";
+        Node *temp = front;
+        while (temp != nullptr)
+        {
+            cout << temp->cor.row << temp->cor.col;
+            temp = temp->next;
+        }
+        cout << endl;
+    }
+
+    Node *peek() { return front; }
+
+    ~Queue()
+    {
+        while (!isEmpty())
+        {
+            dequeue();
+        }
+    }
+};
+
 struct Coin
 {
     int coin_x;
@@ -211,6 +274,7 @@ class Grid
     // keeps track of the players old position
     GridCell *player_prevPos;
     UndoStack *stack;
+    bool invalid_move;
 
     int seed; // for the random function
 
@@ -224,6 +288,7 @@ class Grid
         score = 0;
         player = new Player();
         player_prevPos = nullptr;
+        invalid_move = false;
 
         // setting the dimension
         switch (level)
@@ -368,7 +433,7 @@ class Grid
     void player_movement(int input)
     {
         bool polarOpposite = false;
-        bool invalid_move = false;
+        invalid_move = false;
 
         // temporary storage for new values
         int new_x = player->X;
@@ -445,11 +510,7 @@ class Grid
         }
 
         if (invalid_move)
-        {
-            mvprintw(grid_Xcor + 5, 20, "Invalid move!");
-            refresh();
-            return; // again return
-        }
+            return;
 
         // Update player position if valid move
         player->X = new_x;
@@ -507,7 +568,7 @@ class Grid
 
     void displayGrid()
     {
-        // clear();
+        clear();
         mvprintw(1, 50, "LEVEL: %d", level);
         remaining_moves = player->move_no < moves ? moves - player->move_no : 0;
         mvprintw(2, 20, "Remaining Moves: %d", remaining_moves);
@@ -540,6 +601,18 @@ class Grid
                  "using up, down, left, right arrowkeys  or "
                  " press u for undo or "
                  " press esc to quit): ");
+
+        // print to notify the player entered wrong move
+        if (invalid_move)
+        {
+            mvprintw(grid_Xcor + 5, 10, "Invalid move!");
+            refresh();
+            getch();
+            noecho();
+        }
+
+        // display move history
+        stack->display();
     }
 
     int cityBlockDistance(int x1, int y1, int x2, int y2)
@@ -596,7 +669,6 @@ int main()
     Grid G(level);
     clear(); // clear the screen before making the grid
     G.makGrid();
-    G.stack->display();
 
     int input;
     while (true)
@@ -621,9 +693,6 @@ int main()
             getch();
             break;
         }
-
-        // display move history
-        G.stack->display();
     }
 
     endwin();

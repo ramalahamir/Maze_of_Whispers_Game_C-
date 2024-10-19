@@ -37,7 +37,7 @@ struct coordinates
     }
 };
 
-// making Node and list library for stack
+// making Node and list library for undoStack
 struct Node
 {
     coordinates cor;
@@ -146,7 +146,7 @@ struct Bomb
     char symb = 'B';
 };
 
-class UndoStack
+class Stack
 {
     int size;
     int total_undo;
@@ -154,7 +154,7 @@ class UndoStack
   public:
     Node *top;
 
-    UndoStack(int undoMoves)
+    Stack(int undoMoves)
     {
         top = nullptr;
         size = 0;               // counter
@@ -208,7 +208,7 @@ class UndoStack
     bool isEmpty() { return top == nullptr; }
     int undoMovesLeft() { return size; }
 
-    // displaying stack
+    // displaying Stack
     void display()
     {
         if (isEmpty())
@@ -226,7 +226,7 @@ class UndoStack
 
         while (temp != nullptr)
         {
-            // Print the row and col of each node in the stack
+            // Print the row and col of each node in the Stack
             mvprintw(line, 105, "(%d, %d)", temp->cor.row, temp->cor.col);
             line++; // Move to the next line for the next node
             temp = temp->next;
@@ -263,6 +263,9 @@ class Grid
     int score;
     int remaining_moves;
 
+    int initial_CBD_key;  // initial distance between key and player
+    int initial_CBD_door; // initial distance between door and player
+
     int player_key_dist;
     int player_door_dist;
     int key_door_dist;
@@ -273,7 +276,7 @@ class Grid
 
     // keeps track of the players old position
     GridCell *player_prevPos;
-    UndoStack *stack;
+    Stack *undoStack;
     bool invalid_move;
 
     int seed; // for the random function
@@ -317,6 +320,12 @@ class Grid
 
         // calculating distance differences for player, key and door
         setting_distance_differences();
+
+        // setting the initial distances
+        initial_CBD_key = player_key_dist;
+        initial_CBD_door = player_door_dist;
+
+        // for moves
         int dist = player_door_dist + player_key_dist + key_door_dist;
 
         // setting the moves
@@ -338,8 +347,8 @@ class Grid
         // initially both are same
         remaining_moves = moves;
 
-        // intitalizing stack size
-        stack = new UndoStack(undoMoves);
+        // intitalizing undoStack size
+        undoStack = new Stack(undoMoves);
 
         head = nullptr;
         tail = nullptr;
@@ -377,8 +386,8 @@ class Grid
                 {
                     cell = new GridCell(i, j, 'P');
                     player_prevPos = cell;
-                    stack->Push(player_prevPos->data, player_prevPos->row,
-                                player_prevPos->col);
+                    undoStack->Push(player_prevPos->data, player_prevPos->row,
+                                    player_prevPos->col);
                 }
 
                 // regular cell
@@ -480,12 +489,26 @@ class Grid
             case 'u':
             case 'U':
             {
-                coordinates prev_move = stack->Pop();
-                if (prev_move.row != -1 &&
-                    prev_move.col != -1) // for the initial case
+                coordinates current_move = undoStack->peek();
+                if (current_move.row != -1 &&
+                    current_move.col != -1) // for the initial case
                 {
+                    // pop the current move since forward history no longer
+                    // matters
+                    undoStack->Pop();
+
+                    // after popping the top most element are the new
+                    // coordinates
+                    coordinates prev_move = undoStack->peek();
+
                     player->X = prev_move.row;
                     player->Y = prev_move.col;
+                }
+                else
+                { // stack is empty
+                    invalid_move = true;
+                    player->X = current_move.row;
+                    player->Y = current_move.col;
                 }
                 return; // return control
             }
@@ -517,8 +540,8 @@ class Grid
         player->Y = new_y;
         player->increment_move_no();
 
-        // Push the new move onto the stack
-        stack->Push('P', player->X, player->Y);
+        // Push the new move onto the undoStack
+        undoStack->Push('P', player->X, player->Y);
 
         // Update the last move to the current direction
         last_move = input;
@@ -573,11 +596,11 @@ class Grid
         remaining_moves = player->move_no < moves ? moves - player->move_no : 0;
         mvprintw(2, 20, "Remaining Moves: %d", remaining_moves);
         mvprintw(2, 70, "Remaining Undo Moves: %d",
-                 undoMoves - stack->undoMovesLeft());
+                 undoMoves - undoStack->undoMovesLeft());
         mvprintw(3, 20, "Score: %d", score);
         mvprintw(3, 70, "key status: %s", (key.status == 1 ? "True" : "False"));
 
-        hintSystem();
+        hintSystem(player_key_dist, initial_CBD_key);
 
         // player's new position updation
         adjustingPlayer_onGrid();
@@ -612,7 +635,7 @@ class Grid
         }
 
         // display move history
-        stack->display();
+        undoStack->display();
     }
 
     int cityBlockDistance(int x1, int y1, int x2, int y2)
@@ -624,10 +647,11 @@ class Grid
         return dist;
     }
 
-    void hintSystem()
+    void hintSystem(int curr_dist, int init_dist)
     {
         mvprintw(5, 20, "HINT: ");
-        if (player_key_dist <= 3)
+        // comparing the current and the initial distance
+        if (curr_dist <= init_dist)
             mvprintw(5, 40, "Getting Closer");
         else
             mvprintw(5, 40, "Further Away");

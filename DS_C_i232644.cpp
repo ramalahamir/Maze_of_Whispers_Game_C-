@@ -15,11 +15,14 @@ class GridCell
     GridCell *left;
     GridCell *right;
 
+    char symbol; // for invisible items (bomb, key, door)
+
     GridCell(int r, int c, char val)
     {
         data = val;
         row = r;
         col = c;
+        symbol = '.'; // by default
         up = down = left = right = nullptr;
     }
 };
@@ -105,17 +108,20 @@ class Queue
 
     void displayQueue()
     {
+        clear();
         if (isEmpty())
         {
-            cout << "\nQueue is empty";
+            mvprintw(5, 20, "Queue is empty");
             return;
         }
-        cout << "Queue: ";
+        mvprintw(5, 20, "Queue");
         Node *temp = front;
+        int line = 5;
         while (temp != nullptr)
         {
-            cout << temp->cor.row << temp->cor.col;
+            mvprintw(line, 20, "(%d, %d)", temp->cor.row, temp->cor.col);
             temp = temp->next;
+            line++;
         }
         cout << endl;
     }
@@ -131,34 +137,30 @@ class Queue
     }
 };
 
-struct Coin
-{
-    int coin_x;
-    int coin_y;
-    char symb = 'C';
-};
-
-struct Bomb
-{
-    int bomb_x;
-    int bomb_y;
-    bool detonate;
-    char symb = 'B';
-};
-
 class Stack
 {
     int size;
-    int total_undo;
+    int capacity;
 
   public:
     Node *top;
 
-    Stack(int undoMoves)
+    Stack(int cap)
     {
         top = nullptr;
-        size = 0;               // counter
-        total_undo = undoMoves; // specific number of popping allowed!
+        size = 0;       // counter
+        capacity = cap; // fixed size linked list
+    }
+
+    ~Stack()
+    {
+        Node *temp = top;
+        while (temp != nullptr)
+        {
+            Node *del = temp;
+            temp = temp->next;
+            delete (del);
+        }
     }
 
     void Push(int data, int row, int col)
@@ -176,7 +178,7 @@ class Stack
 
     coordinates Pop()
     {
-        if (isEmpty() || size == total_undo)
+        if (isEmpty() || size == capacity)
             return coordinates(-1, -1);
 
         coordinates pop = top->cor;
@@ -206,7 +208,7 @@ class Stack
     }
 
     bool isEmpty() { return top == nullptr; }
-    int undoMovesLeft() { return size; }
+    int Size() { return size; }
 
     // displaying Stack
     void display()
@@ -262,6 +264,8 @@ class Grid
     int undoMoves;
     int score;
     int remaining_moves;
+    bool invalid_move;
+    bool detonate; // bomb check
 
     int initial_CBD_key;  // initial distance between key and player
     int initial_CBD_door; // initial distance between door and player
@@ -277,18 +281,25 @@ class Grid
     // keeps track of the players old position
     GridCell *player_prevPos;
     Stack *undoStack;
-    bool invalid_move;
+    Stack *coinsStack;
+    Stack *bombStack;
+    Queue *coinCollection;
 
-    int seed; // for the random function
+    // stack sizes
+    int coinSize;
+    int bombSize;
+
+    unsigned long long int seed; // for the random function
+    int coinChangeCounter;
 
     // starting grid X cor and Ycor on screen
     // this will be stored for display setting purposes
     int grid_Xcor, grid_Ycor;
 
-    Grid(int lvl)
+    Grid(int lvl, int random_assci)
     {
         level = lvl;
-        score = 0;
+        coinChangeCounter = score = 0;
         player = new Player();
         player_prevPos = nullptr;
         invalid_move = false;
@@ -308,7 +319,7 @@ class Grid
         }
 
         // generating seed
-        seed = 235 / dimension;
+        seed = random_assci;
 
         // setting the random positions for player, key and door
         key.key_x = random();
@@ -317,6 +328,22 @@ class Grid
         player->Y = random();
         door.door_x = random();
         door.door_y = random();
+
+        // setting the coin and bomb population number
+        coinSize = dimension;
+        bombSize = dimension / 2;
+        coinsStack = new Stack(coinSize);
+        bombStack = new Stack(bombSize);
+
+        // coin placements
+        settingCoinsPosition();
+
+        // setting the bombs
+        for (int i = 0; i < bombSize; i++)
+        {
+            coordinates bomb_cor = setCoordinates(bombStack);
+            bombStack->Push('B', bomb_cor.row, bomb_cor.col);
+        }
 
         // calculating distance differences for player, key and door
         setting_distance_differences();
@@ -354,6 +381,55 @@ class Grid
         tail = nullptr;
     }
 
+    void settingCoinsPosition()
+    {
+        // if previous stack exists pop it all
+        while (!(coinsStack->isEmpty()))
+        {
+            coinsStack->Pop();
+        }
+
+        // setting the new coins
+        for (int i = 0; i < coinSize; i++)
+        {
+            coordinates coin_cor = setCoordinates(coinsStack);
+            coinsStack->Push('C', coin_cor.row, coin_cor.col);
+        }
+    }
+
+    // coordinates that don't overwrite the player, key
+    // or door
+
+    bool overlappingThemselves(int row, int col, Stack *&stack)
+    {
+        // compare the already present items coordinates
+        Node *temp = stack->top;
+        while (temp != nullptr)
+        {
+            // overlaps
+            if (temp->cor.row == row && temp->cor.col == col)
+                return true;
+            temp = temp->next;
+        }
+        return false; // if its unique
+    }
+
+    coordinates setCoordinates(Stack *&stack)
+    {
+        coordinates cor;
+        do
+        {
+            cor.row = random();
+            cor.col = random();
+
+        } while ((cor.row == player->X && cor.col == player->Y) ||
+                 (cor.row == key.key_x && cor.col == key.key_y) ||
+                 (cor.row == door.door_x && cor.col == door.door_y));
+        //(overlappingThemselves(cor.row, cor.col, stack)));
+
+        return cor;
+    }
+
     void setting_distance_differences()
     {
         player_key_dist =
@@ -372,14 +448,20 @@ class Grid
 
         int rows, cols;
         rows = cols = dimension + 2; // because of boundaries
+        bool cell_filled;
 
         for (int i = 0; i < rows; i++)
         {
             for (int j = 0; j < cols; j++)
             {
+                cell_filled = false;
+
                 // setting the up and down boundaries
                 if (i == 0 || j == 0 || i == rows - 1 || j == cols - 1)
+                {
                     cell = new GridCell(i, j, '#');
+                    cell_filled = true;
+                }
 
                 // setting the player on the grid
                 else if (i == player->X && j == player->Y)
@@ -388,10 +470,65 @@ class Grid
                     player_prevPos = cell;
                     undoStack->Push(player_prevPos->data, player_prevPos->row,
                                     player_prevPos->col);
+                    cell_filled = true;
+                }
+
+                // setting the key on the grid
+                else if (i == key.key_x && j == key.key_y)
+                {
+                    // key is invisible
+                    cell = new GridCell(i, j, 'K');
+                    cell->symbol = key.symb;
+                    cell_filled = true;
+                }
+
+                // setting the door on the grid
+                else if (i == door.door_x && j == door.door_y)
+                {
+                    // key is invisible
+                    cell = new GridCell(i, j, 'D');
+                    cell->symbol = door.symb;
+                    cell_filled = true;
+                }
+
+                // if not filled yet
+                else if (cell_filled == false)
+                {
+                    // place the coins
+                    Node *temp = coinsStack->top;
+                    while (temp != nullptr)
+                    {
+                        if (i == temp->cor.row && j == temp->cor.col)
+                        {
+                            cell = new GridCell(i, j, 'C');
+                            cell_filled = true;
+                            break;
+                        }
+                        temp = temp->next;
+                    }
+
+                    // if no coin fills check for bomb placements
+                    if (cell_filled == false)
+                    {
+                        Node *temp = bombStack->top;
+                        while (temp != nullptr)
+                        {
+                            if (i == temp->cor.row && j == temp->cor.col)
+                            {
+                                // bombs are invisible
+                                cell = new GridCell(i, j, 'B');
+                                // set the bomb state of the cell true
+                                cell->symbol = 'B';
+                                cell_filled = true;
+                                break;
+                            }
+                            temp = temp->next;
+                        }
+                    }
                 }
 
                 // regular cell
-                else
+                if (cell_filled == false)
                     cell = new GridCell(i, j, '.');
 
                 // first node
@@ -545,6 +682,11 @@ class Grid
 
         // Update the last move to the current direction
         last_move = input;
+
+        // counter that tracks coin display change timer
+        coinChangeCounter++;
+        if (coinChangeCounter > 5)
+            coinChangeCounter = 0;
     }
 
     // overwrites the grid cells to show updated position
@@ -596,11 +738,14 @@ class Grid
         remaining_moves = player->move_no < moves ? moves - player->move_no : 0;
         mvprintw(2, 20, "Remaining Moves: %d", remaining_moves);
         mvprintw(2, 70, "Remaining Undo Moves: %d",
-                 undoMoves - undoStack->undoMovesLeft());
+                 undoMoves - undoStack->Size());
         mvprintw(3, 20, "Score: %d", score);
         mvprintw(3, 70, "key status: %s", (key.status == 1 ? "True" : "False"));
 
+        // if key status == false
         hintSystem(player_key_dist, initial_CBD_key);
+        // else
+        // hintSystem(player_door_dist, initial_CBD_door);
 
         // player's new position updation
         adjustingPlayer_onGrid();
@@ -659,11 +804,13 @@ class Grid
 
     int random()
     {
-        int a = 1122;
-        int c = 12345;
-        // using LCG formula
-        seed = ((a * seed + c) % dimension) + 1;
-        return seed;
+        int a = 1664525;
+        unsigned long long int c = 1013904223;
+        unsigned long long int m = 4294967296;
+
+        // Update the seed
+        seed = (a * seed + c) % m;
+        return seed % dimension + 1;
     }
 };
 
@@ -679,6 +826,9 @@ int main()
     mvprintw(8, 50, "3. Hard ");
     mvprintw(9, 50, "Enter 1,2,3: ");
     level = getch() - '0'; // getch gets the assci code of the key pressed
+    // user has to press a button again to enter the game and we'll use that as
+    // the seed
+    int random_ascii = getch();
 
     // checking if valid input
     if (level < 1 || level > 3)
@@ -690,7 +840,7 @@ int main()
         return 0; // exits the game
     }
 
-    Grid G(level);
+    Grid G(level, random_ascii);
     clear(); // clear the screen before making the grid
     G.makGrid();
 

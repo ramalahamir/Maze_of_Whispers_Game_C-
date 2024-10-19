@@ -742,13 +742,17 @@ class Grid
         mvprintw(3, 20, "Score: %d", score);
         mvprintw(3, 70, "key status: %s", (key.status == 1 ? "True" : "False"));
 
-        // if key status == false
-        hintSystem(player_key_dist, initial_CBD_key);
-        // else
-        // hintSystem(player_door_dist, initial_CBD_door);
+        // hint system for key and door
+        if (key.status == false)
+            hintSystem(player_key_dist, initial_CBD_key);
+        else
+            hintSystem(player_door_dist, initial_CBD_door);
 
         // player's new position updation
         adjustingPlayer_onGrid();
+
+        // calculate CBD's after each movement!
+        setting_distance_differences();
 
         GridCell *row = head;
         grid_Xcor = 7;

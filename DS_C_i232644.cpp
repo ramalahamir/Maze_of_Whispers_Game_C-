@@ -142,6 +142,7 @@ class Stack
   public:
     Node *top;
 
+    Stack() {}
     Stack(int cap)
     {
         top = nullptr;
@@ -736,6 +737,46 @@ class Grid
             player_prevPos->data = 'P';
     }
 
+    void adjust_coins_position(bool remove = false)
+    {
+        // iterating the linked grid
+        GridCell *temp = head;
+
+        // iterates the rows
+        while (temp->down != nullptr)
+        {
+            // iterates the columns
+            GridCell *cell = temp;
+            while (cell != nullptr)
+            {
+
+                // checking for coins
+                // iterating the coin stack
+                Node *coin = coinsStack->top;
+                while (coin != nullptr)
+                {
+                    // displaying C at the new coordinates
+                    if (cell->row == coin->cor.row &&
+                        cell->col == coin->cor.col)
+                    {
+                        // remove is the state that is deciding whether the
+                        // function is removing the old coins or adding the new
+                        // coins
+                        if (remove)
+                            cell->data = '.';
+                        else
+                            cell->data = 'C';
+                        break;
+                    }
+                    coin = coin->next;
+                }
+
+                cell = cell->right;
+            }
+            temp = temp->down;
+        }
+    }
+
     void player_item_interaction()
     {
         // if valid move check for coin, key, door, bomb interaction
@@ -819,8 +860,16 @@ class Grid
         coinChangeCounter++;
         if (coinChangeCounter == 5)
         {
+            // before resetting the new coins
+            // remove the previous coins in the grid
+            adjust_coins_position(true);
+            // reset the coins
             settingCoinsPosition();
+            // add the new coins to the grid
+            adjust_coins_position();
+
             coinChangeCounter = 0;
+            coinsStack->display();
         }
 
         // calculate CBD's after each movement!
@@ -856,7 +905,7 @@ class Grid
         }
 
         // display move history
-        undoStack->display();
+        // undoStack->display();
     }
 
     int cityBlockDistance(int x1, int y1, int x2, int y2)

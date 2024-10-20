@@ -488,7 +488,7 @@ class Grid
                 else if (i == key.key_x && j == key.key_y)
                 {
                     // key is invisible
-                    cell = new GridCell(i, j, 'K');
+                    cell = new GridCell(i, j, '.');
                     cell->symbol = key.symb;
                     cell_filled = true;
                 }
@@ -497,7 +497,7 @@ class Grid
                 else if (i == door.door_x && j == door.door_y)
                 {
                     // key is invisible
-                    cell = new GridCell(i, j, 'D');
+                    cell = new GridCell(i, j, '.');
                     cell->symbol = door.symb;
                     cell_filled = true;
                 }
@@ -527,7 +527,7 @@ class Grid
                             if (i == temp->cor.row && j == temp->cor.col)
                             {
                                 // bombs are invisible
-                                cell = new GridCell(i, j, 'B');
+                                cell = new GridCell(i, j, '.');
                                 // set the bomb state of the cell true
                                 cell->symbol = 'B';
                                 cell_filled = true;

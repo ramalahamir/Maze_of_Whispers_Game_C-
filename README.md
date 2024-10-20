@@ -97,6 +97,6 @@ At game over, the player’s score will be displayed, along with the positions o
 
 ## Sample Outputs:
 
-![level 1](images\Screenshot (20).png)
-![level 2](images\Screenshot (22).png)
-![level 3](images\Screenshot (23).png)
+![level 1](images/Screenshot_20.png)
+![level 2](images/Screenshot_22.png)
+![level 3](images/Screenshot_23.png)

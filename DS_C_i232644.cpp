@@ -987,6 +987,8 @@ int main()
         {
             clear();
             mvprintw(7, 50, "GAME OVER!");
+            if (G.remaining_moves == 0)
+                mvprintw(8, 40, "you ran out of moves");
             if (G.gameover)
                 mvprintw(8, 40, "you stepped on a bomb");
             getch();
@@ -1009,7 +1011,6 @@ int main()
             break;
         }
     }
-
     endwin();
     // endwin() ends the "curses mode" and brings the terminal back to normal
     return 0;

@@ -94,3 +94,9 @@ At game over, the player’s score will be displayed, along with the positions o
 1. The project assumes full control over the PDCurses library, which is the only external library used.
 2. All other functionality, such as the random number generation, has been implemented manually without using built-in libraries.
 3. Static and global variables/functions are assumed to be allowed but have not been used in this implementation.
+
+## Sample Outputs:
+
+![level 1](images\Screenshot (20).png)
+![level 2](images\Screenshot (22).png)
+![level 3](images\Screenshot (23).png)

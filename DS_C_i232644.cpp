@@ -704,6 +704,9 @@ class Grid
         // if player moved up
         if (player->X == player_prevPos->row - 1)
         {
+            // check for interaction after each movement
+            player_item_interaction(player_prevPos->up);
+
             player_prevPos->up->data = 'P';
             // update the players new posiion as prev
             player_prevPos = player_prevPos->up;
@@ -712,6 +715,9 @@ class Grid
         // if player moved down
         else if (player->X == player_prevPos->row + 1)
         {
+            // check for interaction after each movement
+            player_item_interaction(player_prevPos->down);
+
             player_prevPos->down->data = 'P';
             // update the players new posiion as prev
             player_prevPos = player_prevPos->down;
@@ -720,6 +726,9 @@ class Grid
         // if player moved left
         else if (player->Y == player_prevPos->col - 1)
         {
+            // check for interaction after each movement
+            player_item_interaction(player_prevPos->left);
+
             player_prevPos->left->data = 'P';
             // update the players new posiion as prev
             player_prevPos = player_prevPos->left;
@@ -728,6 +737,9 @@ class Grid
         // if player moved right
         else if (player->Y == player_prevPos->col + 1)
         {
+            // check for interaction after each movement
+            player_item_interaction(player_prevPos->right);
+
             player_prevPos->right->data = 'P';
             // update the players new posiion as prev
             player_prevPos = player_prevPos->right;
@@ -777,40 +789,30 @@ class Grid
         }
     }
 
-    void player_item_interaction()
+    void player_item_interaction(GridCell *&player_pos_cell)
     {
         // if valid move check for coin, key, door, bomb interaction
         if (!invalid_move)
         {
-            // check for coin interaction
-            Node *temp = coinsStack->top;
-            while (temp != nullptr)
+            // if the new player position had the coin
+            // add the coordinates to the queue
+            if (player_pos_cell->data == 'C')
             {
-                if (player->X == temp->cor.row && player->Y == temp->cor.row)
-                {
-                    // fill the coin collected queue
-                    coinCollection->enqueue(player->X, player->Y);
+                coinCollection->enqueue(player->X, player->Y);
 
-                    // player gets 2 points and an undo move
-                    score += 2;
-                    undoMoves++;
-                    undoStack->updateCapacity(1);
-                    return;
-                }
-                temp = temp->next;
+                // player gets 2 points and an undo move
+                score += 2;
+                undoMoves++;
+                undoStack->updateCapacity(1);
+                return;
             }
 
-            // check for bomb interaction
-            temp = bombStack->top;
-            while (temp != nullptr)
+            // checking if the symbol was a bomb because bombs are invisible
+            if (player_pos_cell->symbol == 'B')
             {
-                if (player->X == temp->cor.row && player->Y == temp->cor.row)
-                {
-                    // game ends
-                    gameover = true;
-                    return;
-                }
-                temp = temp->next;
+                // game ends
+                gameover = true;
+                return;
             }
 
             // check for key interaction
@@ -835,8 +837,8 @@ class Grid
     {
         clear();
 
-        // check for interaction after each movement
-        player_item_interaction();
+        // player's new position updation
+        adjustingPlayer_onGrid();
 
         mvprintw(1, 50, "LEVEL: %d", level);
         remaining_moves = player->move_no < moves ? moves - player->move_no : 0;
@@ -852,9 +854,6 @@ class Grid
         else
             hintSystem(player_door_dist, initial_CBD_door);
 
-        // player's new position updation
-        adjustingPlayer_onGrid();
-
         // change the coins position based on the counter
         // i.e change after every 5 moves
         coinChangeCounter++;
@@ -869,7 +868,6 @@ class Grid
             adjust_coins_position();
 
             coinChangeCounter = 0;
-            coinsStack->display();
         }
 
         // calculate CBD's after each movement!
@@ -905,7 +903,7 @@ class Grid
         }
 
         // display move history
-        // undoStack->display();
+        undoStack->display();
     }
 
     int cityBlockDistance(int x1, int y1, int x2, int y2)

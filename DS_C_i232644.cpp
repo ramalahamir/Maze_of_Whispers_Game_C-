@@ -44,14 +44,12 @@ struct coordinates
 struct Node
 {
     coordinates cor;
-    int data;
     Node *next;
 
-    Node(int r, int c, int val)
+    Node(int r, int c)
     {
         cor.row = r;
         cor.col = c;
-        data = val;
         next = nullptr;
     }
 };
@@ -81,9 +79,9 @@ class Queue
 
     bool isEmpty() { return front == nullptr; }
 
-    void enqueue(char data, int row, int col)
+    void enqueue(int row, int col)
     {
-        Node *newNode = new Node(data, row, col);
+        Node *newNode = new Node(row, col);
         if (isEmpty())
             front = rear = newNode;
         else
@@ -93,37 +91,36 @@ class Queue
         }
     }
 
-    void dequeue()
+    coordinates dequeue()
     {
         if (isEmpty())
-        {
-            cout << "\nQueue is empty";
-            return;
-        }
+            return coordinates(-1, -1);
+
+        coordinates cor = front->cor;
+
         Node *temp = front;
         front = front->next;
-        cout << "\nRemoving node... \nData: " << temp->data;
         delete temp;
+
+        return cor;
     }
 
     void displayQueue()
     {
-        clear();
         if (isEmpty())
         {
-            mvprintw(5, 20, "Queue is empty");
+            mvprintw(10, 20, "Queue is empty");
             return;
         }
-        mvprintw(5, 20, "Queue");
+
         Node *temp = front;
-        int line = 5;
+        int line = 10;
         while (temp != nullptr)
         {
-            mvprintw(line, 20, "(%d, %d)", temp->cor.row, temp->cor.col);
+            mvprintw(line, 20, "(C, %d, %d)", temp->cor.row, temp->cor.col);
             temp = temp->next;
             line++;
         }
-        cout << endl;
     }
 
     Node *peek() { return front; }
@@ -163,9 +160,9 @@ class Stack
         }
     }
 
-    void Push(int data, int row, int col)
+    void Push(int row, int col)
     {
-        Node *temp = new Node(row, col, data);
+        Node *temp = new Node(row, col);
 
         if (isEmpty())
             top = temp;
@@ -209,6 +206,7 @@ class Stack
 
     bool isEmpty() { return top == nullptr; }
     int Size() { return size; }
+    void updateCapacity(int n) { capacity += n; }
 
     // displaying Stack
     void display()
@@ -265,7 +263,8 @@ class Grid
     int score;
     int remaining_moves;
     bool invalid_move;
-    bool detonate; // bomb check
+    bool gameover; // for bombs
+    bool gamewin;
 
     int initial_CBD_key;  // initial distance between key and player
     int initial_CBD_door; // initial distance between door and player
@@ -302,7 +301,8 @@ class Grid
         coinChangeCounter = score = 0;
         player = new Player();
         player_prevPos = nullptr;
-        invalid_move = false;
+        invalid_move = gameover = gamewin = false;
+        coinCollection = new Queue();
 
         // setting the dimension
         switch (level)
@@ -332,18 +332,13 @@ class Grid
         // setting the coin and bomb population number
         coinSize = dimension;
         bombSize = dimension / 2;
-        coinsStack = new Stack(coinSize);
-        bombStack = new Stack(bombSize);
+        bombStack = coinsStack = nullptr;
 
         // coin placements
         settingCoinsPosition();
 
         // setting the bombs
-        for (int i = 0; i < bombSize; i++)
-        {
-            coordinates bomb_cor = setCoordinates(bombStack);
-            bombStack->Push('B', bomb_cor.row, bomb_cor.col);
-        }
+        settingBombsPosition();
 
         // calculating distance differences for player, key and door
         setting_distance_differences();
@@ -383,26 +378,40 @@ class Grid
 
     void settingCoinsPosition()
     {
-        // if previous stack exists pop it all
-        while (!(coinsStack->isEmpty()))
-        {
-            coinsStack->Pop();
-        }
+        // delete the previous stack
+        if (coinsStack != nullptr)
+            delete coinsStack;
+        coinsStack = new Stack(coinSize);
 
         // setting the new coins
         for (int i = 0; i < coinSize; i++)
         {
             coordinates coin_cor = setCoordinates(coinsStack);
-            coinsStack->Push('C', coin_cor.row, coin_cor.col);
+            coinsStack->Push(coin_cor.row, coin_cor.col);
         }
     }
 
-    // coordinates that don't overwrite the player, key
-    // or door
+    void settingBombsPosition()
+    {
+        // delete the previous stack
+        if (bombStack != nullptr)
+            delete bombStack;
+        bombStack = new Stack(bombSize);
+
+        // setting the new bombs
+        for (int i = 0; i < bombSize; i++)
+        {
+            coordinates bomb_cor = setCoordinates(bombStack);
+            bombStack->Push(bomb_cor.row, bomb_cor.col);
+        }
+    }
 
     bool overlappingThemselves(int row, int col, Stack *&stack)
     {
         // compare the already present items coordinates
+        if (stack->top == nullptr)
+            return false;
+
         Node *temp = stack->top;
         while (temp != nullptr)
         {
@@ -414,6 +423,8 @@ class Grid
         return false; // if its unique
     }
 
+    // coordinates that don't overwrite the player, key
+    // or door
     coordinates setCoordinates(Stack *&stack)
     {
         coordinates cor;
@@ -424,8 +435,8 @@ class Grid
 
         } while ((cor.row == player->X && cor.col == player->Y) ||
                  (cor.row == key.key_x && cor.col == key.key_y) ||
-                 (cor.row == door.door_x && cor.col == door.door_y));
-        //(overlappingThemselves(cor.row, cor.col, stack)));
+                 (cor.row == door.door_x && cor.col == door.door_y) ||
+                 (overlappingThemselves(cor.row, cor.col, stack)));
 
         return cor;
     }
@@ -468,8 +479,7 @@ class Grid
                 {
                     cell = new GridCell(i, j, 'P');
                     player_prevPos = cell;
-                    undoStack->Push(player_prevPos->data, player_prevPos->row,
-                                    player_prevPos->col);
+                    undoStack->Push(player_prevPos->row, player_prevPos->col);
                     cell_filled = true;
                 }
 
@@ -678,15 +688,10 @@ class Grid
         player->increment_move_no();
 
         // Push the new move onto the undoStack
-        undoStack->Push('P', player->X, player->Y);
+        undoStack->Push(player->X, player->Y);
 
         // Update the last move to the current direction
         last_move = input;
-
-        // counter that tracks coin display change timer
-        coinChangeCounter++;
-        if (coinChangeCounter > 5)
-            coinChangeCounter = 0;
     }
 
     // overwrites the grid cells to show updated position
@@ -731,9 +736,67 @@ class Grid
             player_prevPos->data = 'P';
     }
 
+    void player_item_interaction()
+    {
+        // if valid move check for coin, key, door, bomb interaction
+        if (!invalid_move)
+        {
+            // check for coin interaction
+            Node *temp = coinsStack->top;
+            while (temp != nullptr)
+            {
+                if (player->X == temp->cor.row && player->Y == temp->cor.row)
+                {
+                    // fill the coin collected queue
+                    coinCollection->enqueue(player->X, player->Y);
+
+                    // player gets 2 points and an undo move
+                    score += 2;
+                    undoMoves++;
+                    undoStack->updateCapacity(1);
+                    return;
+                }
+                temp = temp->next;
+            }
+
+            // check for bomb interaction
+            temp = bombStack->top;
+            while (temp != nullptr)
+            {
+                if (player->X == temp->cor.row && player->Y == temp->cor.row)
+                {
+                    // game ends
+                    gameover = true;
+                    return;
+                }
+                temp = temp->next;
+            }
+
+            // check for key interaction
+            if (player->X == key.key_x && player->Y == key.key_y)
+            {
+                // key obtained indicator
+                key.status = true;
+                return;
+            }
+
+            // check for door interaction
+            if (player->X == door.door_x && player->Y == door.door_y &&
+                key.status == true)
+            {
+                gamewin = true;
+                return;
+            }
+        }
+    }
+
     void displayGrid()
     {
         clear();
+
+        // check for interaction after each movement
+        player_item_interaction();
+
         mvprintw(1, 50, "LEVEL: %d", level);
         remaining_moves = player->move_no < moves ? moves - player->move_no : 0;
         mvprintw(2, 20, "Remaining Moves: %d", remaining_moves);
@@ -750,6 +813,15 @@ class Grid
 
         // player's new position updation
         adjustingPlayer_onGrid();
+
+        // change the coins position based on the counter
+        // i.e change after every 5 moves
+        coinChangeCounter++;
+        if (coinChangeCounter == 5)
+        {
+            settingCoinsPosition();
+            coinChangeCounter = 0;
+        }
 
         // calculate CBD's after each movement!
         setting_distance_differences();
@@ -864,10 +936,28 @@ int main()
         G.player_movement(input);
 
         // i.e esc key or moves are completed
-        if (input == 27 || G.remaining_moves == 0)
+        if (input == 27 || G.remaining_moves == 0 || G.gameover)
         {
             clear();
             mvprintw(7, 50, "GAME OVER!");
+            if (G.gameover)
+                mvprintw(8, 40, "you stepped on a bomb");
+            getch();
+            break;
+        }
+
+        if (G.gamewin)
+        {
+            clear();
+            mvprintw(7, 50, "YOU WON!");
+
+            // add the remaining moves into the score
+            G.score += G.remaining_moves;
+
+            mvprintw(8, 40, "your score: %d", G.score);
+            mvprintw(9, 40, "coins collected: ");
+            G.coinCollection->displayQueue();
+
             getch();
             break;
         }

@@ -109,12 +109,12 @@ class Queue
     {
         if (isEmpty())
         {
-            mvprintw(10, 20, "Queue is empty");
+            mvprintw(11, 20, "Queue is empty");
             return;
         }
 
         Node *temp = front;
-        int line = 10;
+        int line = 11;
         while (temp != nullptr)
         {
             mvprintw(line, 20, "(C, %d, %d)", temp->cor.row, temp->cor.col);
@@ -335,11 +335,11 @@ class Grid
         bombSize = dimension / 2;
         bombStack = coinsStack = nullptr;
 
-        // coin placements
-        settingCoinsPosition();
-
         // setting the bombs
         settingBombsPosition();
+
+        // coin placements
+        settingCoinsPosition();
 
         // calculating distance differences for player, key and door
         setting_distance_differences();
@@ -387,7 +387,15 @@ class Grid
         // setting the new coins
         for (int i = 0; i < coinSize; i++)
         {
-            coordinates coin_cor = setCoordinates(coinsStack);
+            coordinates coin_cor;
+            // coins should not overlap the bombs
+            do
+            {
+                coin_cor = setCoordinates(coinsStack);
+            } while (
+                overlappingThemselves(coin_cor.row, coin_cor.col, bombStack));
+
+            // push the unique coordinate
             coinsStack->Push(coin_cor.row, coin_cor.col);
         }
     }
@@ -606,7 +614,8 @@ class Grid
             case 'W':
                 if (last_move == 's') // if the last move was down
                     polarOpposite = true;
-                new_x = player->X - 1;
+                if (player->X > 0)
+                    new_x = player->X - 1;
                 break;
 
             // DOWN
@@ -614,7 +623,8 @@ class Grid
             case 'S':
                 if (last_move == 'w') // if the last move was up
                     polarOpposite = true;
-                new_x = player->X + 1;
+                if (player->X <= dimension)
+                    new_x = player->X + 1;
                 break;
 
             // LEFT
@@ -622,7 +632,8 @@ class Grid
             case 'A':
                 if (last_move == 'd') // if the last move was right
                     polarOpposite = true;
-                new_y = player->Y - 1;
+                if (player->Y > 0)
+                    new_y = player->Y - 1;
                 break;
 
             // RIGHT
@@ -630,35 +641,34 @@ class Grid
             case 'D':
                 if (last_move == 'a') // if the last move was left
                     polarOpposite = true;
-                new_y = player->Y + 1;
+                if (player->X <= dimension)
+                    new_y = player->Y + 1;
                 break;
 
             // Undo movement
             case 'u':
             case 'U':
             {
-                coordinates current_move = undoStack->peek();
-                if (current_move.row != -1 &&
-                    current_move.col != -1) // for the initial case
+                if (!undoStack->isEmpty())
                 {
-                    // pop the current move since forward history no longer
-                    // matters
+                    // pop the current move since forward history doesn't matter
                     undoStack->Pop();
 
-                    // after popping the top most element are the new
+                    // after popping the top most element, below are the new
                     // coordinates
-                    coordinates prev_move = undoStack->peek();
+                    coordinates prev_move = undoStack->Pop();
 
-                    player->X = prev_move.row;
-                    player->Y = prev_move.col;
+                    // if move exists only then undo
+                    if (prev_move.row != -1 && prev_move.row != -1)
+                    {
+                        player->X = prev_move.row;
+                        player->Y = prev_move.col;
+
+                        // Push the new move onto the undoStack
+                        undoStack->Push(player->X, player->Y);
+                    }
                 }
-                else
-                { // stack is empty
-                    invalid_move = true;
-                    player->X = current_move.row;
-                    player->Y = current_move.col;
-                }
-                return; // return control
+                return;
             }
 
             default:
@@ -667,18 +677,13 @@ class Grid
         }
 
         // Check if move is within grid boundaries
-        if (new_x == 0 || new_x == dimension + 1 || new_y == 0 ||
-            new_y == dimension + 1)
+        if (new_x <= 0 || new_x >= dimension + 1 || new_y <= 0 ||
+            new_y >= dimension + 1)
             invalid_move = true;
 
         // If the move is polar opposite, don't allow it without undo
         if (polarOpposite)
-        {
-            mvprintw(grid_Xcor + 5, 20,
-                     "You cannot move back without undo. Press 'u' to undo.");
-            refresh();
             invalid_move = true;
-        }
 
         if (invalid_move)
             return;
@@ -904,6 +909,7 @@ class Grid
 
         // display move history
         undoStack->display();
+        refresh();
     }
 
     int cityBlockDistance(int x1, int y1, int x2, int y2)
@@ -934,6 +940,16 @@ class Grid
         // Update the seed
         seed = (a * seed + c) % m;
         return seed % dimension + 1;
+    }
+
+    void display_score()
+    {
+        // add the remaining moves into the score
+        score += remaining_moves;
+
+        mvprintw(9, 40, "your score: %d", score);
+        mvprintw(10, 40, "coins collected: ");
+        coinCollection->displayQueue();
     }
 };
 
@@ -991,6 +1007,7 @@ int main()
                 mvprintw(8, 40, "you ran out of moves");
             if (G.gameover)
                 mvprintw(8, 40, "you stepped on a bomb");
+            G.display_score();
             getch();
             break;
         }
@@ -999,14 +1016,7 @@ int main()
         {
             clear();
             mvprintw(7, 50, "YOU WON!");
-
-            // add the remaining moves into the score
-            G.score += G.remaining_moves;
-
-            mvprintw(8, 40, "your score: %d", G.score);
-            mvprintw(9, 40, "coins collected: ");
-            G.coinCollection->displayQueue();
-
+            G.display_score();
             getch();
             break;
         }

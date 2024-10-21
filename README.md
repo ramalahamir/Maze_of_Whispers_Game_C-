@@ -46,7 +46,7 @@ Along the way, they can collect coins to gain extra undo moves. The player must 
 
 - The game starts with the player placed in a dark maze.
 - The key and door are hidden, and the player can only sense their proximity to the key.
-- Use the sensing ability to guide your movement and find the key before time runs out.
+- Use the sensing ability to guide your movement and find the key before moves runs out.
 - Collect coins for extra undo moves, but avoid stepping on bombs!
 
 ## Difficulty Levels

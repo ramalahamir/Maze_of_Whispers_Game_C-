@@ -1,5 +1,4 @@
 #include "C:/Users/Administrator/vcpkg/installed/x64-windows/include/curses.h"
-#include <iostream>
 
 using namespace std;
 

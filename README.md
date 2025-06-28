@@ -1,7 +1,6 @@
-# assignment_02
+# Maze of Whispers
 
 Author: Ramalah Amir
-Roll no: 23i2644
 
 # Introduction
 
